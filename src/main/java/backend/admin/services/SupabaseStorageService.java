@@ -20,4 +20,10 @@ public interface SupabaseStorageService {
      * Deletes an object if {@code publicUrl} matches this project's public URL pattern; no-op otherwise.
      */
     void deleteObjectByPublicUrlIfPresent(String publicUrl) throws IOException;
+
+    /**
+     * Pour l’affichage navigateur : si l’URL est une URL publique Supabase de ce projet, retourne une URL signée
+     * (fonctionne même si le bucket est privé). Sinon retourne l’URL inchangée. Ne lève pas : en cas d’échec, retourne l’URL d’origine.
+     */
+    String toBrowserAccessibleImageUrl(String storedUrl);
 }

@@ -16,8 +16,8 @@ public class Sponsor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "image")
-    private String image;  // Gardez-le mais sans la dépendance storage
+    @Column(name = "image", columnDefinition = "TEXT")
+    private String image;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "information_id")

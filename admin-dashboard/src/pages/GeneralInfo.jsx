@@ -1,33 +1,103 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AppContext } from '../App';
 
+const INFORMATION_ID = 1;
+
 export default function GeneralInfo() {
-  const { showToast } = useContext(AppContext);
+  const { showToast, baseUrl } = useContext(AppContext);
   const [info, setInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const loadInfo = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    const url = `${baseUrl.replace(/\/$/, '')}/informations/${INFORMATION_ID}`;
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) {
+        setLoadError(`Aucune information avec l'id ${INFORMATION_ID}.`);
+        setInfo(null);
+        showToast(`Information #${INFORMATION_ID} introuvable.`, false);
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setInfo({
+        id: data.id,
+        moveProfetionelle: data.moveProfetionelle ?? '',
+        storageSolution: data.storageSolution ?? '',
+        yearsExperience: data.yearsExperience ?? '',
+        phone1: data.phone1 ?? '',
+        phone2: data.phone2 ?? '',
+        email: data.email ?? '',
+      });
+    } catch (e) {
+      setLoadError(e.message || 'Erreur réseau');
+      setInfo(null);
+      showToast(`Chargement impossible : ${e.message || 'erreur'}`, false);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast non stable
+  }, [baseUrl]);
 
   useEffect(() => {
-    // Artificial 0.6s delay to show skeleton
-    setTimeout(() => {
-      setInfo({
-        moveProfetionelle: 'Déménagement pour professionnels et particuliers',
-        storageSolution: 'Entrepôts sécurisés 24/7',
-        yearsExperience: 15,
-        phone1: '+33 1 23 45 67 89',
-        phone2: '+33 6 12 34 56 78',
-        email: 'contact@transglobal.com'
-      });
-    }, 600);
-  }, []);
+    loadInfo();
+  }, [loadInfo]);
 
-  const saveInfo = () => {
-    showToast('Informations enregistrées !');
+  const saveInfo = async () => {
+    if (!info) return;
+    setSaving(true);
+    try {
+      const url = `${baseUrl.replace(/\/$/, '')}/informations/${INFORMATION_ID}`;
+      const years =
+        info.yearsExperience === '' || info.yearsExperience === null || info.yearsExperience === undefined
+          ? null
+          : Number(info.yearsExperience);
+      const body = {
+        id: info.id,
+        moveProfetionelle: info.moveProfetionelle,
+        storageSolution: info.storageSolution,
+        yearsExperience: Number.isFinite(years) ? years : null,
+        phone1: info.phone1,
+        phone2: info.phone2,
+        email: info.email,
+      };
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const updated = await res.json();
+      setInfo({
+        id: updated.id,
+        moveProfetionelle: updated.moveProfetionelle ?? '',
+        storageSolution: updated.storageSolution ?? '',
+        yearsExperience: updated.yearsExperience ?? '',
+        phone1: updated.phone1 ?? '',
+        phone2: updated.phone2 ?? '',
+        email: updated.email ?? '',
+      });
+      showToast('Informations enregistrées !');
+    } catch (e) {
+      showToast(`Enregistrement impossible : ${e.message || 'erreur'}`, false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChange = (e) => {
-    setInfo({ ...info, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setInfo((prev) => ({
+      ...prev,
+      [name]: name === 'yearsExperience' ? (value === '' ? '' : Number(value)) : value,
+    }));
   };
 
-  if (!info) {
+  if (loading || (!info && !loadError)) {
     return (
       <div className="card">
         <div className="card-hdr">
@@ -43,16 +113,34 @@ export default function GeneralInfo() {
     );
   }
 
+  if (loadError && !info) {
+    return (
+      <div className="card">
+        <div className="card-hdr">
+          <div>
+            <div className="card-title">Informations Générales</div>
+            <div className="card-sub">Fiche #{INFORMATION_ID}</div>
+          </div>
+          <button type="button" className="btn btn-sm" onClick={() => loadInfo()}>Réessayer</button>
+        </div>
+        <div className="empty" style={{ padding: '24px' }}>
+          <p>{loadError}</p>
+          <p style={{ fontSize: '13px', color: 'var(--txt3)', marginTop: '8px' }}>GET {baseUrl}/informations/{INFORMATION_ID}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <div className="card-hdr">
         <div>
           <div className="card-title">Informations Générales</div>
-          <div className="card-sub">Paramètres et informations clés de l'entreprise</div>
+          <div className="card-sub">Paramètres et informations clés de l'entreprise (fiche #{info.id})</div>
         </div>
-        <button className="btn btn-p" onClick={saveInfo}>
+        <button type="button" className="btn btn-p" onClick={saveInfo} disabled={saving}>
           <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="1.8"/><polyline points="17,21 17,13 7,13 7,21" stroke="currentColor" strokeWidth="1.8"/><polyline points="7,3 7,8 15,8" stroke="currentColor" strokeWidth="1.8"/></svg>
-          Enregistrer
+          {saving ? '…' : 'Enregistrer'}
         </button>
       </div>
 

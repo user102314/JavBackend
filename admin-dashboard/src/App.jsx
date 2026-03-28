@@ -129,7 +129,9 @@ export default function App() {
   const [toastMsg, setToastMsg] = useState('');
   const [toastOk, setToastOk] = useState(true);
   
-  const [baseUrl, setBaseUrl] = useState(localStorage.getItem('tg_api') || 'http://localhost:8080');
+  const [baseUrl, setBaseUrl] = useState(
+    localStorage.getItem('tg_api') || import.meta.env.VITE_API_URL || 'http://localhost:9090'
+  );
   const [actionTrigger, setActionTrigger] = useState(null); 
 
   useEffect(() => {
