@@ -1,4 +1,4 @@
-package backend.admin.controllers;
+package backend.admin.controller;
 
 import backend.admin.dto.ContactDTO;
 import backend.admin.dto.InformationDTO;
@@ -7,8 +7,12 @@ import backend.admin.dto.SponsorDTO;
 import backend.admin.services.InformationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -58,6 +62,17 @@ public class InformationController {
     @PostMapping("/{infoId}/sponsors")
     public ResponseEntity<InformationDTO> addSponsor(@PathVariable Long infoId, @RequestBody SponsorDTO sponsorDTO) {
         InformationDTO updated = informationService.addSponsorToInformation(infoId, sponsorDTO);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Uploads the image to Supabase Storage and attaches the public URL to a new sponsor.
+     */
+    @PostMapping(value = "/{infoId}/sponsors/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<InformationDTO> addSponsorWithUpload(
+            @PathVariable Long infoId,
+            @RequestPart("file") MultipartFile file) throws IOException {
+        InformationDTO updated = informationService.addSponsorImageToInformation(infoId, file);
         return ResponseEntity.ok(updated);
     }
 

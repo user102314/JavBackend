@@ -1,4 +1,4 @@
-package backend.admin.serviceimpl;
+package backend.admin.servicesimpliment;
 
 import backend.admin.dto.ContactDTO;
 import backend.admin.models.Contact;

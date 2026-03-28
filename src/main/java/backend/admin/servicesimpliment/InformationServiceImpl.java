@@ -1,12 +1,16 @@
-package backend.admin.serviceimpl;
+package backend.admin.servicesimpliment;
 
 import backend.admin.dto.*;
 import backend.admin.models.*;
 import backend.admin.repository.*;
 import backend.admin.services.InformationService;
+import backend.admin.services.SupabaseStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -20,6 +24,7 @@ public class InformationServiceImpl implements InformationService {
     private final OfficeRepository officeRepository;
     private final SponsorRepository sponsorRepository;
     private final ContactRepository contactRepository;
+    private final SupabaseStorageService supabaseStorageService;
 
     @Override
     public InformationDTO createInformation(InformationDTO informationDTO) {
@@ -86,6 +91,23 @@ public class InformationServiceImpl implements InformationService {
 
         Sponsor sponsor = new Sponsor();
         sponsor.setImage(sponsorDTO.getImage());
+        sponsor.setInformation(information);
+
+        Sponsor savedSponsor = sponsorRepository.save(sponsor);
+        information.getSponsors().add(savedSponsor);
+
+        return mapToDTO(information);
+    }
+
+    @Override
+    public InformationDTO addSponsorImageToInformation(Long infoId, MultipartFile file) throws IOException {
+        Information information = informationRepository.findById(infoId)
+                .orElseThrow(() -> new RuntimeException("Information not found"));
+
+        String publicUrl = supabaseStorageService.uploadPublicFile(file, "info-" + infoId);
+
+        Sponsor sponsor = new Sponsor();
+        sponsor.setImage(publicUrl);
         sponsor.setInformation(information);
 
         Sponsor savedSponsor = sponsorRepository.save(sponsor);

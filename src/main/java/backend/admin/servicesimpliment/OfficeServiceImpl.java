@@ -1,4 +1,4 @@
-package backend.admin.serviceimpl;
+package backend.admin.servicesimpliment;
 
 import backend.admin.dto.OfficeDTO;
 import backend.admin.models.Office;

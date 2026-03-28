@@ -1,12 +1,14 @@
-package backend.admin.serviceimpl;
+package backend.admin.servicesimpliment;
 
 import backend.admin.dto.SponsorDTO;
 import backend.admin.models.Sponsor;
 import backend.admin.repository.SponsorRepository;
 import backend.admin.services.SponsorService;
+import backend.admin.services.SupabaseStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
 public class SponsorServiceImpl implements SponsorService {
 
     private final SponsorRepository sponsorRepository;
+    private final SupabaseStorageService supabaseStorageService;
 
     @Override
     public SponsorDTO createSponsor(SponsorDTO sponsorDTO) {
@@ -37,7 +40,14 @@ public class SponsorServiceImpl implements SponsorService {
 
     @Override
     public void deleteSponsor(Long id) {
-        sponsorRepository.deleteById(id);
+        Sponsor sponsor = sponsorRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Sponsor not found"));
+        try {
+            supabaseStorageService.deleteObjectByPublicUrlIfPresent(sponsor.getImage());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to delete file from storage", e);
+        }
+        sponsorRepository.delete(sponsor);
     }
 
     @Override

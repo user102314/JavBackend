@@ -1,4 +1,4 @@
-package backend.admin.controllers;
+package backend.admin.controller;
 
 import backend.admin.dto.OfficeDTO;
 import backend.admin.services.OfficeService;
