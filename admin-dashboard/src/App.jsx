@@ -1,9 +1,9 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 export const AppContext = createContext();
 
-const Sidebar = ({ isOpen, setOpen }) => {
+const Sidebar = ({ isOpen, setOpen, onLogout }) => {
   return (
     <>
       <div className={`mob-overlay ${isOpen ? 'open' : ''}`} onClick={() => setOpen(false)}></div>
@@ -40,7 +40,10 @@ const Sidebar = ({ isOpen, setOpen }) => {
         <div className="s-foot">
           <div className="s-user">
             <div className="avatar">AD</div>
-            <div><div className="u-name">Admin</div><div className="u-role">Super-admin</div></div>
+            <div style={{flex:1}}><div className="u-name">Admin</div><div className="u-role">Super-admin</div></div>
+            <button className="btn btn-sm" onClick={onLogout} title="Déconnexion" style={{padding:'6px',border:'1px solid var(--bdr2)'}}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
           </div>
         </div>
       </aside>
@@ -116,6 +119,33 @@ const Topbar = ({ setSidebarOpen }) => {
   );
 };
 
+/* ─── Route guard: redirects to /login if not authenticated ─── */
+const ProtectedRoute = ({ admin, children }) => {
+  if (!admin) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+/* ─── Login wrapper: uses useNavigate to redirect after login ─── */
+import LoginPage from './pages/Login';
+
+const LoginRoute = ({ admin, onLogin }) => {
+  const navigate = useNavigate();
+
+  // If already logged in, redirect to contacts
+  if (admin) {
+    return <Navigate to="/contacts" replace />;
+  }
+
+  const handleLogin = (adminData) => {
+    onLogin(adminData);
+    navigate('/contacts', { replace: true });
+  };
+
+  return <LoginPage onLogin={handleLogin} />;
+};
+
 import Contacts from './pages/Contacts';
 import Offices from './pages/Offices';
 import GeneralInfo from './pages/GeneralInfo';
@@ -134,6 +164,25 @@ export default function App() {
   );
   const [actionTrigger, setActionTrigger] = useState(null); 
 
+  // ─── Auth state ───
+  const [admin, setAdmin] = useState(() => {
+    try {
+      const stored = localStorage.getItem('tg_admin');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogin = (adminData) => {
+    setAdmin(adminData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('tg_admin');
+    setAdmin(null);
+  };
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
@@ -150,11 +199,7 @@ export default function App() {
     clearTimeout(toastTimeout); toastTimeout = setTimeout(() => setToastShow(false), 3500);
   };
 
-  const pingUrl = async (url) => {
-    // Ping implementation removed
-  };
-
-  useEffect(() => { }, []);
+  const pingUrl = async (url) => {};
 
   const triggerAction = (action) => setActionTrigger({ action, ts: Date.now() });
 
@@ -162,24 +207,36 @@ export default function App() {
     <AppContext.Provider value={{
       baseUrl, setBaseUrl, pingUrl,
       toastShow, toastMsg, toastOk, showToast,
-      actionTrigger, triggerAction, theme, toggleTheme
+      actionTrigger, triggerAction, theme, toggleTheme,
+      admin
     }}>
       <BrowserRouter>
-        <Sidebar isOpen={sidebarOpen} setOpen={setSidebarOpen} />
-        <main className="main">
-          <ApiBar />
-          <Topbar setSidebarOpen={setSidebarOpen} />
-          <div className="content">
-            <Routes>
-              <Route path="/" element={<Navigate to="/contacts" replace />} />
-              <Route path="/contacts" element={<Contacts />} />
-              <Route path="/offices" element={<Offices />} />
-              <Route path="/general-info" element={<GeneralInfo />} />
-              <Route path="/sponsors" element={<Sponsors />} />
-              <Route path="/content-blocks" element={<ContentBlocks />} />
-            </Routes>
-          </div>
-        </main>
+        <Routes>
+          {/* ─── Login route (public) ─── */}
+          <Route path="/login" element={<LoginRoute admin={admin} onLogin={handleLogin} />} />
+
+          {/* ─── Protected routes (need auth) ─── */}
+          <Route path="/*" element={
+            <ProtectedRoute admin={admin}>
+              <Sidebar isOpen={sidebarOpen} setOpen={setSidebarOpen} onLogout={handleLogout} />
+              <main className="main">
+                <ApiBar />
+                <Topbar setSidebarOpen={setSidebarOpen} />
+                <div className="content">
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/contacts" replace />} />
+                    <Route path="/contacts" element={<Contacts />} />
+                    <Route path="/offices" element={<Offices />} />
+                    <Route path="/general-info" element={<GeneralInfo />} />
+                    <Route path="/sponsors" element={<Sponsors />} />
+                    <Route path="/content-blocks" element={<ContentBlocks />} />
+                    <Route path="*" element={<Navigate to="/contacts" replace />} />
+                  </Routes>
+                </div>
+              </main>
+            </ProtectedRoute>
+          } />
+        </Routes>
         <Toast />
       </BrowserRouter>
     </AppContext.Provider>

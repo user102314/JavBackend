@@ -12,6 +12,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +24,14 @@ public class BlockServiceImpl implements BlockService {
 
     private final BlockRepository blockRepository;
     private final SupabaseStorageService supabaseStorageService;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BlockDTO> getAllBlocks() {
+        return blockRepository.findAll().stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
 
     @Override
     public BlockDTO createBlock(String titre, String description, MultipartFile imageFile) throws IOException {

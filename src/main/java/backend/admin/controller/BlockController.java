@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/blocks")
@@ -17,6 +18,11 @@ import java.io.IOException;
 public class BlockController {
 
     private final BlockService blockService;
+
+    @GetMapping
+    public ResponseEntity<List<BlockDTO>> getAllBlocks() {
+        return ResponseEntity.ok(blockService.getAllBlocks());
+    }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BlockDTO> createBlock(

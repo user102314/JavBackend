@@ -1,10 +1,11 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { AppContext } from '../App';
 
 export default function ContentBlocks() {
-  const { actionTrigger, showToast } = useContext(AppContext);
+  const { actionTrigger, showToast, baseUrl } = useContext(AppContext);
   const [blocks, setBlocks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [newBlock, setNewBlock] = useState({ title: '', description: '', image: null, imagePreview: null });
@@ -13,35 +14,28 @@ export default function ContentBlocks() {
   const fileInputRef = useRef();
   const [dragOver, setDragOver] = useState(false);
 
-  useEffect(() => {
+  const root = useCallback(() => baseUrl.replace(/\/$/, ''), [baseUrl]);
+
+  /* ─── Charger tous les blocs depuis l'API ─── */
+  const loadBlocks = useCallback(async () => {
     setLoading(true);
-    setTimeout(() => {
-      setBlocks([
-        {
-          id: 1,
-          title: 'Notre Mission',
-          description: 'TransGlobal s\'engage à fournir des solutions de transport et de logistique de qualité supérieure, garantissant la satisfaction totale de nos clients à travers le monde.',
-          image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&h=360&fit=crop',
-          createdAt: '2024-01-15'
-        },
-        {
-          id: 2,
-          title: 'Services Premium',
-          description: 'Découvrez notre gamme complète de services premium incluant le déménagement international, le stockage sécurisé et la gestion logistique personnalisée.',
-          image: 'https://images.unsplash.com/photo-1553413077-190dd305871c?w=600&h=360&fit=crop',
-          createdAt: '2024-02-20'
-        },
-        {
-          id: 3,
-          title: 'Engagement Environnemental',
-          description: 'Notre flotte de véhicules écologiques et nos pratiques durables contribuent activement à la préservation de l\'environnement tout en maintenant un service de haute qualité.',
-          image: null,
-          createdAt: '2024-03-10'
-        }
-      ]);
+    try {
+      const res = await fetch(`${root()}/blocks`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setBlocks(Array.isArray(data) ? data : []);
+    } catch (e) {
+      showToast(`Chargement des blocs impossible : ${e.message || 'erreur'}`, false);
+      setBlocks([]);
+    } finally {
       setLoading(false);
-    }, 700);
-  }, []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root]);
+
+  useEffect(() => {
+    loadBlocks();
+  }, [loadBlocks]);
 
   useEffect(() => {
     if (actionTrigger?.action === 'new-block') {
@@ -54,8 +48,8 @@ export default function ContentBlocks() {
   const openEdit = (block) => {
     setEditId(block.id);
     setNewBlock({
-      title: block.title,
-      description: block.description,
+      title: block.titre || block.title || '',
+      description: block.description || '',
       image: block.image,
       imagePreview: block.image
     });
@@ -89,51 +83,80 @@ export default function ContentBlocks() {
     setNewBlock(prev => ({ ...prev, image: null, imagePreview: null }));
   };
 
-  const saveBlock = () => {
+  /* ─── Créer ou mettre à jour un bloc via l'API ─── */
+  const saveBlock = async () => {
     if (!newBlock.title.trim()) {
       showToast('Le titre est requis.', false);
       return;
     }
-    if (!newBlock.description.trim()) {
-      showToast('La description est requise.', false);
-      return;
-    }
 
-    const imageUrl = newBlock.imagePreview || null;
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('titre', newBlock.title.trim());
+      fd.append('description', newBlock.description || '');
 
-    if (editId) {
-      setBlocks(blocks.map(b =>
-        b.id === editId
-          ? { ...b, title: newBlock.title, description: newBlock.description, image: imageUrl }
-          : b
-      ));
-      showToast('Bloc de contenu mis à jour !');
-    } else {
-      setBlocks([...blocks, {
-        id: Date.now(),
-        title: newBlock.title,
-        description: newBlock.description,
-        image: imageUrl,
-        createdAt: new Date().toISOString().split('T')[0]
-      }]);
-      showToast('Bloc de contenu créé !');
+      // Si c'est un vrai fichier (File object), on l'ajoute
+      if (newBlock.image instanceof File) {
+        fd.append('file', newBlock.image);
+      }
+
+      if (editId) {
+        /* ─── UPDATE ─── */
+        const res = await fetch(`${root()}/blocks/${editId}`, {
+          method: 'PUT',
+          body: fd,
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        showToast('Bloc de contenu mis à jour !');
+      } else {
+        /* ─── CREATE ─── */
+        if (!(newBlock.image instanceof File)) {
+          showToast("L'image est requise pour créer un bloc.", false);
+          setSaving(false);
+          return;
+        }
+        const res = await fetch(`${root()}/blocks`, {
+          method: 'POST',
+          body: fd,
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        showToast('Bloc de contenu créé !');
+      }
+
+      setModalOpen(false);
+      setEditId(null);
+      await loadBlocks();
+    } catch (e) {
+      showToast(`Erreur : ${e.message || 'Impossible de sauvegarder'}`, false);
+    } finally {
+      setSaving(false);
     }
-    setModalOpen(false);
-    setEditId(null);
   };
 
-  const handleDelete = () => {
-    if (deleteData) {
-      setBlocks(blocks.filter(b => b.id !== deleteData.id));
+  /* ─── Supprimer un bloc via l'API ─── */
+  const handleDelete = async () => {
+    if (!deleteData) return;
+    try {
+      const res = await fetch(`${root()}/blocks/${deleteData.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       showToast('Bloc supprimé avec succès.');
       setDeleteData(null);
+      await loadBlocks();
+    } catch (e) {
+      showToast(`Suppression impossible : ${e.message || 'erreur'}`, false);
     }
   };
 
-  const formatDate = (dateStr) => {
-    const opts = { day: '2-digit', month: 'short', year: 'numeric' };
-    return new Date(dateStr).toLocaleDateString('fr-FR', opts);
-  };
+  /* ─── Helpers ─── */
+  const getTitle = (b) => b.titre || b.title || '';
+  const getImage = (b) => b.image || null;
 
   return (
     <>
@@ -145,11 +168,11 @@ export default function ContentBlocks() {
         </div>
         <div className="stat-c">
           <div className="stat-l">Avec Image</div>
-          <div className="stat-v">{loading ? <div className="skeleton" style={{width:'40px'}}></div> : blocks.filter(b => b.image).length}</div>
+          <div className="stat-v">{loading ? <div className="skeleton" style={{width:'40px'}}></div> : blocks.filter(b => getImage(b)).length}</div>
         </div>
         <div className="stat-c">
           <div className="stat-l">Sans Image</div>
-          <div className="stat-v">{loading ? <div className="skeleton" style={{width:'40px'}}></div> : blocks.filter(b => !b.image).length}</div>
+          <div className="stat-v">{loading ? <div className="skeleton" style={{width:'40px'}}></div> : blocks.filter(b => !getImage(b)).length}</div>
         </div>
       </div>
 
@@ -185,8 +208,8 @@ export default function ContentBlocks() {
             <div className="cb-card" key={b.id} style={{animationDelay: `${idx * 80}ms`}}>
               {/* Image area */}
               <div className="cb-img-wrap">
-                {b.image ? (
-                  <img className="cb-img" src={b.image} alt={b.title} onError={(e) => { e.target.style.display = 'none'; }} />
+                {getImage(b) ? (
+                  <img className="cb-img" src={getImage(b)} alt={getTitle(b)} onError={(e) => { e.target.style.display = 'none'; }} />
                 ) : (
                   <div className="cb-img-placeholder">
                     <svg width="32" height="32" fill="none" viewBox="0 0 24 24">
@@ -205,7 +228,7 @@ export default function ContentBlocks() {
                   <button className="btn btn-sm" onClick={() => openEdit(b)} style={{background: 'rgba(0,0,0,0.6)', borderColor: 'transparent', color: '#fff', backdropFilter: 'blur(4px)'}}>
                     <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="1.8"/></svg>
                   </button>
-                  <button className="btn btn-sm btn-d" onClick={() => setDeleteData({id: b.id, label: b.title})} style={{background: 'rgba(248,113,113,0.2)', borderColor: 'transparent', color: '#fff', backdropFilter: 'blur(4px)'}}>
+                  <button className="btn btn-sm btn-d" onClick={() => setDeleteData({id: b.id, label: getTitle(b)})} style={{background: 'rgba(248,113,113,0.2)', borderColor: 'transparent', color: '#fff', backdropFilter: 'blur(4px)'}}>
                     <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6" stroke="currentColor" strokeWidth="1.8"/><path d="M19 6l-1 14H6L5 6M9 6V4h6v2" stroke="currentColor" strokeWidth="1.8"/></svg>
                   </button>
                 </div>
@@ -213,18 +236,15 @@ export default function ContentBlocks() {
 
               {/* Body */}
               <div className="cb-body">
-                <div className="cb-title">{b.title}</div>
+                <div className="cb-title">{getTitle(b)}</div>
                 <div className="cb-desc">{b.description}</div>
               </div>
 
               {/* Footer */}
               <div className="cb-footer">
-                <div className="cb-date">
-                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                  {formatDate(b.createdAt)}
-                </div>
+                <span className="badge bb" style={{fontSize: '10px'}}>ID: {b.id}</span>
                 <span className="badge bp" style={{fontSize: '10px'}}>
-                  {b.image ? '🖼 Image' : '📝 Texte'}
+                  {getImage(b) ? '🖼 Image' : '📝 Texte'}
                 </span>
               </div>
             </div>
@@ -241,27 +261,26 @@ export default function ContentBlocks() {
           </div>
           {viewBlock && (
             <>
-              {viewBlock.image && (
+              {getImage(viewBlock) && (
                 <div className="img-preview-wrap" style={{marginBottom: '20px', height: '240px'}}>
-                  <img src={viewBlock.image} alt={viewBlock.title} />
+                  <img src={getImage(viewBlock)} alt={getTitle(viewBlock)} />
                 </div>
               )}
               <div className="fg" style={{marginBottom: '16px'}}>
                 <label>Titre</label>
-                <input value={viewBlock.title} readOnly style={{opacity: 0.8}} />
+                <input value={getTitle(viewBlock)} readOnly style={{opacity: 0.8}} />
               </div>
               <div className="fg" style={{marginBottom: '16px'}}>
                 <label>Description</label>
-                <textarea value={viewBlock.description} readOnly style={{opacity: 0.8, minHeight: '100px'}}></textarea>
+                <textarea value={viewBlock.description || ''} readOnly style={{opacity: 0.8, minHeight: '100px'}}></textarea>
               </div>
               <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
                 <span className="badge bb">ID: {viewBlock.id}</span>
-                <span className="badge bp">{viewBlock.image ? 'Avec image' : 'Sans image'}</span>
-                <span className="badge bg">Créé le {formatDate(viewBlock.createdAt)}</span>
+                <span className="badge bp">{getImage(viewBlock) ? 'Avec image' : 'Sans image'}</span>
               </div>
               <div style={{marginTop: '18px', paddingTop: '18px', borderTop: '1px solid var(--bdr)', display: 'flex', justifyContent: 'flex-end', gap: '8px'}}>
                 <button className="btn btn-sm" onClick={() => { setViewBlock(null); openEdit(viewBlock); }}>Modifier</button>
-                <button className="btn btn-sm btn-d" onClick={() => { setViewBlock(null); setDeleteData({id: viewBlock.id, label: viewBlock.title}); }}>Supprimer</button>
+                <button className="btn btn-sm btn-d" onClick={() => { setViewBlock(null); setDeleteData({id: viewBlock.id, label: getTitle(viewBlock)}); }}>Supprimer</button>
                 <button className="btn btn-sm" onClick={() => setViewBlock(null)}>Fermer</button>
               </div>
             </>
@@ -299,13 +318,13 @@ export default function ContentBlocks() {
                 <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               <p>{dragOver ? 'Relâchez pour uploader...' : 'Cliquez ou glissez une image ici'}</p>
-              <small>PNG, JPG, WebP · Optionnel</small>
+              <small>PNG, JPG, WebP · {editId ? 'Optionnel (garder l\'image actuelle)' : 'Requis'}</small>
             </div>
           )}
 
           {/* Title Input */}
           <div className="fg" style={{marginBottom: '16px'}}>
-            <label>Titre du bloc <code className="f">title</code></label>
+            <label>Titre du bloc <code className="f">titre</code></label>
             <input
               type="text"
               value={newBlock.title}
@@ -326,10 +345,21 @@ export default function ContentBlocks() {
           </div>
 
           <div className="f-acts">
-            <button className="btn" onClick={() => { setModalOpen(false); setEditId(null); }}>Annuler</button>
-            <button className="btn btn-p" onClick={saveBlock}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="1.8"/><polyline points="17,21 17,13 7,13 7,21" stroke="currentColor" strokeWidth="1.8"/></svg>
-              {editId ? 'Mettre à jour' : 'Créer le Bloc'}
+            <button className="btn" onClick={() => { setModalOpen(false); setEditId(null); }} disabled={saving}>Annuler</button>
+            <button className="btn btn-p" onClick={saveBlock} disabled={saving}>
+              {saving ? (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" style={{animation: 'spin 1s linear infinite'}}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round"/>
+                  </svg>
+                  Envoi...
+                </>
+              ) : (
+                <>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" strokeWidth="1.8"/><polyline points="17,21 17,13 7,13 7,21" stroke="currentColor" strokeWidth="1.8"/></svg>
+                  {editId ? 'Mettre à jour' : 'Créer le Bloc'}
+                </>
+              )}
             </button>
           </div>
         </div>

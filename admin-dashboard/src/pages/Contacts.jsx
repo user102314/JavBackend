@@ -51,12 +51,19 @@ export default function Contacts() {
     loadContacts();
   }, [loadContacts]);
 
-  const handleDelete = () => {
-    if (deleteData) {
-      setContacts(contacts.filter(c => c.id !== deleteData.id));
+  const handleDelete = async () => {
+    if (!deleteData) return;
+    try {
+      const res = await fetch(`${baseUrl.replace(/\/$/, '')}/contacts/${deleteData.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       showToast(`Contact "${deleteData.label}" supprimé.`);
       setDeleteData(null);
       setViewContact(null);
+      await loadContacts();
+    } catch (e) {
+      showToast(`Suppression impossible : ${e.message || 'erreur'}`, false);
     }
   };
 
