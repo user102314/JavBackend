@@ -88,7 +88,6 @@ public class BlockServiceImpl implements BlockService {
     }
 
     private BlockDTO toDto(Block block) {
-        String img = supabaseStorageService.toBrowserAccessibleImageUrl(block.getImage());
-        return new BlockDTO(block.getId(), block.getTitre(), block.getDescription(), img);
+        return new BlockDTO(block.getId(), block.getTitre(), block.getDescription(), block.getImage());
     }
 }

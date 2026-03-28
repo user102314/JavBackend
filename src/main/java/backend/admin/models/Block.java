@@ -22,6 +22,6 @@ public class Block {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "image", columnDefinition = "TEXT")
+    @Column(name = "image")
     private String image;
 }
