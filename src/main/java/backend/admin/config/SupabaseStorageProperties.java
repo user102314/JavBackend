@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "supabase.storage")
 public class SupabaseStorageProperties {
 
-    /**
+    /**z
      * Project URL without trailing slash, e.g. https://xxxxx.supabase.co
      */
     private String projectUrl = "";

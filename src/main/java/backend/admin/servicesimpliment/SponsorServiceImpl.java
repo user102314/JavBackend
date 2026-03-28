@@ -71,6 +71,7 @@ public class SponsorServiceImpl implements SponsorService {
     }
 
     private SponsorDTO mapToDTO(Sponsor sponsor) {
-        return new SponsorDTO(sponsor.getId(), sponsor.getImage());
+        String image = supabaseStorageService.toBrowserAccessibleImageUrl(sponsor.getImage());
+        return new SponsorDTO(sponsor.getId(), image);
     }
 }

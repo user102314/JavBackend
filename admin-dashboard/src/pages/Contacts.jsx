@@ -1,24 +1,55 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AppContext } from '../App';
 
+function formatContactDate(value) {
+  if (value == null) return '—';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length >= 3) {
+    const [y, m, d] = value;
+    return `${String(y)}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  return String(value);
+}
+
 export default function Contacts() {
-  const { showToast } = useContext(AppContext);
+  const { showToast, baseUrl } = useContext(AppContext);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewContact, setViewContact] = useState(null);
-  const [deleteData, setDeleteData] = useState(null); 
+  const [deleteData, setDeleteData] = useState(null);
+
+  const loadContacts = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    const url = `${baseUrl.replace(/\/$/, '')}/contacts`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+      setContacts(
+        list.map((c) => ({
+          ...c,
+          date: formatContactDate(c.date),
+        }))
+      );
+    } catch (e) {
+      setLoadError(e.message || 'Erreur réseau');
+      setContacts([]);
+      showToast(`Impossible de charger les contacts : ${e.message || 'erreur'}`, false);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast stable for UX
+  }, [baseUrl]);
 
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => {
-      setContacts([
-        { id: 1, firstName: 'Jean', lastName: 'Dupont', phone: '+33 6 12 34 56 78', email: 'jean.dupont@test.com', originCity: 'Paris', distnationCity: 'Lyon', date: '2023-10-15', description: 'Besoin d\'un transporteur assez rapidement pour un meuble lourd.' },
-        { id: 2, firstName: 'Marie', lastName: 'Curie', phone: '+33 6 87 65 43 21', email: 'marie.c@lab.com', originCity: 'Marseille', distnationCity: 'Nice', date: '2023-11-02', description: 'Urgence livraison équipement de laboratoire fragile.' }
-      ]);
-      setLoading(false);
-    }, 800);
-  }, []);
+    loadContacts();
+  }, [loadContacts]);
 
   const handleDelete = () => {
     if (deleteData) {
@@ -56,12 +87,18 @@ export default function Contacts() {
             <div className="card-title">Liste des Contacts</div>
             <div className="card-sub">Liste et gestion des prises de contact</div>
           </div>
-          <button className="btn btn-sm" onClick={() => showToast('Contacts rafraîchis !')}>
+          <button className="btn btn-sm" onClick={() => { loadContacts().then(() => showToast('Contacts rafraîchis !')); }} disabled={loading}>
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><polyline points="23,4 23,10 17,10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
             Rafraîchir
           </button>
         </div>
         
+        {loadError && (
+          <div className="empty" style={{ margin: '0 0 12px', padding: '12px', background: 'var(--bg4)', borderRadius: '8px' }}>
+            <p style={{ margin: 0 }}>API : {baseUrl}/contacts — {loadError}</p>
+          </div>
+        )}
+
         <div className="srch">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8"/><path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
           <input type="text" placeholder="Rechercher par nom, email, ville…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />

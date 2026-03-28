@@ -1,25 +1,52 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AppContext } from '../App';
 
 export default function Offices() {
-  const { actionTrigger, showToast } = useContext(AppContext);
+  const { actionTrigger, showToast, baseUrl } = useContext(AppContext);
   const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+  const [loadError, setLoadError] = useState(null);
+  const [saving, setSaving] = useState(false);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editOId, setEditOId] = useState(null);
   const [officeName, setOfficeName] = useState('');
-  
-  const [deleteData, setDeleteData] = useState(null); 
+
+  const [deleteData, setDeleteData] = useState(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  useEffect(() => {
+  const api = useCallback(
+    (path, options = {}) => {
+      const url = `${baseUrl.replace(/\/$/, '')}${path}`;
+      return fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        ...options,
+      });
+    },
+    [baseUrl]
+  );
+
+  const loadOffices = useCallback(async () => {
     setLoading(true);
-    setTimeout(() => {
-      setOffices([ { id: 1, officeName: 'Agence Paris' }, { id: 2, officeName: 'Agence Lyon' } ]);
+    setLoadError(null);
+    try {
+      const res = await api('/offices');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setOffices(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setLoadError(e.message || 'Erreur réseau');
+      setOffices([]);
+      showToast(`Chargement des agences impossible : ${e.message || 'erreur'}`, false);
+    } finally {
       setLoading(false);
-    }, 800);
-  }, []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- showToast non stable
+  }, [api]);
+
+  useEffect(() => {
+    loadOffices();
+  }, [loadOffices]);
 
   useEffect(() => {
     if (actionTrigger?.action === 'new-office') {
@@ -31,25 +58,47 @@ export default function Offices() {
     setEditOId(id); setOfficeName(nm); setModalOpen(true);
   };
 
-  const saveOffice = () => {
+  const saveOffice = async () => {
     if (!officeName.trim()) { showToast('Nom requis.', false); return; }
-    if (editOId) {
-      setOffices(offices.map(o => o.id === editOId ? { ...o, officeName } : o));
-      showToast('Agence mise à jour !');
-    } else {
-      setOffices([...offices, { id: Date.now(), officeName }]);
-      showToast('Agence créée !');
+    setSaving(true);
+    try {
+      if (editOId) {
+        const res = await api(`/offices/${editOId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ id: editOId, officeName: officeName.trim() }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast('Agence mise à jour !');
+      } else {
+        const res = await api('/offices', {
+          method: 'POST',
+          body: JSON.stringify({ officeName: officeName.trim() }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast('Agence créée !');
+      }
+      setModalOpen(false);
+      await loadOffices();
+    } catch (e) {
+      showToast(`Enregistrement impossible : ${e.message || 'erreur'}`, false);
+    } finally {
+      setSaving(false);
     }
-    setModalOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteConfirmText !== deleteData.label) {
       showToast('Texte de confirmation incorrect.', false); return;
     }
-    setOffices(offices.filter(o => o.id !== deleteData.id));
-    showToast(`Agence supprimée.`);
-    setDeleteData(null); setDeleteConfirmText('');
+    try {
+      const res = await api(`/offices/${deleteData.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast('Agence supprimée.');
+      setDeleteData(null); setDeleteConfirmText('');
+      await loadOffices();
+    } catch (e) {
+      showToast(`Suppression impossible : ${e.message || 'erreur'}`, false);
+    }
   };
 
   const triggerDeleteModal = (o) => {
@@ -59,6 +108,11 @@ export default function Offices() {
 
   return (
     <>
+      {loadError && (
+        <div className="empty" style={{ marginBottom: '14px', padding: '12px', background: 'var(--bg4)', borderRadius: '8px' }}>
+          <p style={{ margin: 0 }}>API : {baseUrl}/offices — {loadError}</p>
+        </div>
+      )}
       <div className="og">
         {loading ? [...Array(4)].map((_, i) => (
           <div className="oc" key={i}>
@@ -103,8 +157,8 @@ export default function Offices() {
             <input type="text" value={officeName} onChange={e => setOfficeName(e.target.value)} placeholder="Ex: Agence Sfax" />
           </div>
           <div className="f-acts">
-            <button className="btn" onClick={() => setModalOpen(false)}>Annuler</button>
-            <button className="btn btn-p" onClick={saveOffice}>Enregistrer</button>
+            <button className="btn" onClick={() => setModalOpen(false)} disabled={saving}>Annuler</button>
+            <button className="btn btn-p" onClick={saveOffice} disabled={saving}>{saving ? '…' : 'Enregistrer'}</button>
           </div>
         </div>
       </div>

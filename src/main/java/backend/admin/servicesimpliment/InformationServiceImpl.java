@@ -187,7 +187,9 @@ public class InformationServiceImpl implements InformationService {
     }
 
     private SponsorDTO mapSponsorToDTO(Sponsor sponsor) {
-        return new SponsorDTO(sponsor.getId(), sponsor.getImage());
+        return new SponsorDTO(
+                sponsor.getId(),
+                supabaseStorageService.toBrowserAccessibleImageUrl(sponsor.getImage()));
     }
 
     private ContactDTO mapContactToDTO(Contact contact) {
