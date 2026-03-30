@@ -20,4 +20,6 @@ public interface SupabaseStorageService {
      * Deletes an object if {@code publicUrl} matches this project's public URL pattern; no-op otherwise.
      */
     void deleteObjectByPublicUrlIfPresent(String publicUrl) throws IOException;
+
+    String toBrowserAccessibleImageUrl(String image);
 }

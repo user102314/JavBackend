@@ -7,10 +7,8 @@ const SPONSOR_INFORMATION_ID = 1;
 function isLikelyValidImageUrl(url) {
   if (!url || typeof url !== 'string') return false;
   const u = url.trim();
-  if (!u.startsWith('http')) return false;
-  // Ancienne colonne trop courte : URL coupée avant ".co"
-  if (/https?:\/\/[a-z0-9-]+\.supabase$/i.test(u)) return false;
-  return true;
+  // Pour les buckets privés on reçoit des URLs signées (http/https).
+  return u.startsWith('http');
 }
 
 export default function Sponsors() {

@@ -1,21 +1,29 @@
 package backend.admin.servicesimpliment;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import backend.admin.config.SupabaseStorageProperties;
 import backend.admin.services.SupabaseStorageService;
+import backend.admin.services.SupabaseStorageException;
 import lombok.RequiredArgsConstructor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,7 +31,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SupabaseStorageServiceImpl implements SupabaseStorageService {
 
+    private static final Logger log = LoggerFactory.getLogger(SupabaseStorageServiceImpl.class);
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+
     private final SupabaseStorageProperties properties;
+    private final ObjectMapper objectMapper;
     private final OkHttpClient httpClient = new OkHttpClient();
 
     private void ensureConfigured() {
@@ -124,10 +136,99 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         }
     }
 
+    @Override
+    public String toBrowserAccessibleImageUrl(String image) {
+        if (!StringUtils.hasText(image)) return "";
+
+        try {
+            ensureConfigured();
+
+            // If it's already an absolute URL, try to extract the storage object path and sign it.
+            // This is important when the bucket is private: /object/public is not readable from browser.
+            if (image.startsWith("http://") || image.startsWith("https://")) {
+                String objectPath = extractObjectPath(image);
+                if (!StringUtils.hasText(objectPath)) {
+                    return image; // can't extract: return as-is
+                }
+                return createSignedUrl(objectPath);
+            }
+
+            // Otherwise treat it as a raw object path inside the bucket.
+            return createSignedUrl(image);
+        } catch (Exception e) {
+            // Fail safe: don't break the UI completely.
+            log.warn("Failed to build signed image URL: {}", e.getMessage());
+            return image;
+        }
+    }
+
     private String publicUrlFor(String objectPath) {
         String base = normalizeBaseUrl();
         String bucket = properties.getBucket().trim();
         return base + "/storage/v1/object/public/" + bucket + "/" + encodePathSegments(objectPath);
+    }
+
+    private String extractObjectPath(String storedUrl) {
+        String bucket = properties.getBucket().trim();
+        String markerPublic = "/storage/v1/object/public/" + bucket + "/";
+        String markerAuth = "/storage/v1/object/authenticated/" + bucket + "/";
+
+        int idx = storedUrl.indexOf(markerPublic);
+        if (idx >= 0) {
+            String enc = storedUrl.substring(idx + markerPublic.length());
+            return URLDecoder.decode(enc, StandardCharsets.UTF_8);
+        }
+
+        idx = storedUrl.indexOf(markerAuth);
+        if (idx >= 0) {
+            String enc = storedUrl.substring(idx + markerAuth.length());
+            return URLDecoder.decode(enc, StandardCharsets.UTF_8);
+        }
+
+        return null;
+    }
+
+    private String createSignedUrl(String objectPath) throws IOException {
+        String bucket = properties.getBucket().trim();
+        String projectBase = normalizeBaseUrl();
+        String signPath = bucket + "/" + objectPath;
+
+        String encodedSignPath = encodePathSegments(signPath);
+        String endpoint = projectBase + "/storage/v1/object/sign/" + encodedSignPath;
+
+        Map<String, Object> bodyMap = new LinkedHashMap<>();
+        bodyMap.put("expiresIn", 7200); // 2h
+
+        String json = objectMapper.writeValueAsString(bodyMap);
+        RequestBody body = RequestBody.create(json, JSON);
+
+        Request request = new Request.Builder()
+                .url(endpoint)
+                .addHeader("Authorization", "Bearer " + properties.getServiceRoleKey())
+                .addHeader("apikey", properties.getServiceRoleKey())
+                .post(body)
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            String respText = response.body() != null ? response.body().string() : "";
+            if (!response.isSuccessful()) {
+                throw new SupabaseStorageException("Supabase sign URL failed (HTTP " + response.code() + "): " + respText);
+            }
+
+            JsonNode root = objectMapper.readTree(respText);
+            String rel = null;
+            if (root.has("signedURL")) rel = root.get("signedURL").asText();
+            else if (root.has("signedUrl")) rel = root.get("signedUrl").asText();
+
+            if (!StringUtils.hasText(rel)) return publicUrlFor(objectPath);
+
+            if (rel.startsWith("http://") || rel.startsWith("https://")) return rel;
+
+            // Match supabase-js storage-js behaviour: `${this.url}${data.signedURL}` where this.url ends with `/storage/v1`.
+            String prefix = projectBase + "/storage/v1";
+            if (rel.startsWith("/")) return prefix + rel;
+            return prefix + "/" + rel;
+        }
     }
 
     /** Encode each path segment; keep slashes between segments. */
