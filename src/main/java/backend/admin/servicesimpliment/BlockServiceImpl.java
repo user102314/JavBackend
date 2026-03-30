@@ -88,6 +88,7 @@ public class BlockServiceImpl implements BlockService {
     }
 
     private BlockDTO toDto(Block block) {
-        return new BlockDTO(block.getId(), block.getTitre(), block.getDescription(), block.getImage());
-    }
+        // Important: buckets can be private, so we must return a browser-accessible URL (signed if needed).
+        String img = supabaseStorageService.toBrowserAccessibleImageUrl(block.getImage());
+        return new BlockDTO(block.getId(), block.getTitre(), block.getDescription(), img);    }
 }
