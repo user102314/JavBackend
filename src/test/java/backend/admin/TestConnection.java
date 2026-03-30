@@ -7,9 +7,14 @@ public class TestConnection {
         // Force IPv4
         System.setProperty("java.net.preferIPv4Stack", "true");
 
-        String url      = "jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require";
-        String user     = "postgres.kdxswrwcinikvmaquolv";
-        String password = "Oussamaoussam";
+        String url = firstNonBlank(System.getenv("DB_URL"), System.getProperty("DB_URL"));
+        String user = firstNonBlank(System.getenv("DB_USERNAME"), System.getProperty("DB_USERNAME"));
+        String password = firstNonBlank(System.getenv("DB_PASSWORD"), System.getProperty("DB_PASSWORD"));
+
+        if (isBlank(url) || isBlank(user) || isBlank(password)) {
+            System.err.println("Missing DB_URL / DB_USERNAME / DB_PASSWORD in environment.");
+            System.exit(1);
+        }
 
         try {
             System.out.println("========================================");
@@ -37,5 +42,15 @@ public class TestConnection {
             System.err.println("❌ Échec de connexion: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (!isBlank(a)) return a;
+        if (!isBlank(b)) return b;
+        return null;
     }
 }
