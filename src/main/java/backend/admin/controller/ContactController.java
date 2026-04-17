@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -16,13 +17,13 @@ public class ContactController {
     private final ContactService contactService;
 
     @PostMapping
-    public ResponseEntity<ContactDTO> createContact(@RequestBody ContactDTO contactDTO) {
+    public ResponseEntity<ContactDTO> createContact(@Valid @RequestBody ContactDTO contactDTO) {
         ContactDTO created = contactService.createContact(contactDTO);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ContactDTO> updateContact(@PathVariable Long id, @RequestBody ContactDTO contactDTO) {
+    public ResponseEntity<ContactDTO> updateContact(@PathVariable Long id, @Valid @RequestBody ContactDTO contactDTO) {
         ContactDTO updated = contactService.updateContact(id, contactDTO);
         return ResponseEntity.ok(updated);
     }

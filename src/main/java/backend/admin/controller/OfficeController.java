@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -16,13 +17,13 @@ public class OfficeController {
     private final OfficeService officeService;
 
     @PostMapping
-    public ResponseEntity<OfficeDTO> createOffice(@RequestBody OfficeDTO officeDTO) {
+    public ResponseEntity<OfficeDTO> createOffice(@Valid @RequestBody OfficeDTO officeDTO) {
         OfficeDTO created = officeService.createOffice(officeDTO);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<OfficeDTO> updateOffice(@PathVariable Long id, @RequestBody OfficeDTO officeDTO) {
+    public ResponseEntity<OfficeDTO> updateOffice(@PathVariable Long id, @Valid @RequestBody OfficeDTO officeDTO) {
         OfficeDTO updated = officeService.updateOffice(id, officeDTO);
         return ResponseEntity.ok(updated);
     }

@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.Valid;
 
 import java.io.IOException;
 import java.util.List;
@@ -23,13 +24,13 @@ public class InformationController {
     private final InformationService informationService;
 
     @PostMapping
-    public ResponseEntity<InformationDTO> createInformation(@RequestBody InformationDTO informationDTO) {
+    public ResponseEntity<InformationDTO> createInformation(@Valid @RequestBody InformationDTO informationDTO) {
         InformationDTO created = informationService.createInformation(informationDTO);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<InformationDTO> updateInformation(@PathVariable Long id, @RequestBody InformationDTO informationDTO) {
+    public ResponseEntity<InformationDTO> updateInformation(@PathVariable Long id, @Valid @RequestBody InformationDTO informationDTO) {
         InformationDTO updated = informationService.updateInformation(id, informationDTO);
         return ResponseEntity.ok(updated);
     }
@@ -54,13 +55,13 @@ public class InformationController {
     }
 
     @PostMapping("/{infoId}/offices")
-    public ResponseEntity<InformationDTO> addOffice(@PathVariable Long infoId, @RequestBody OfficeDTO officeDTO) {
+    public ResponseEntity<InformationDTO> addOffice(@PathVariable Long infoId, @Valid @RequestBody OfficeDTO officeDTO) {
         InformationDTO updated = informationService.addOfficeToInformation(infoId, officeDTO);
         return ResponseEntity.ok(updated);
     }
 
     @PostMapping("/{infoId}/sponsors")
-    public ResponseEntity<InformationDTO> addSponsor(@PathVariable Long infoId, @RequestBody SponsorDTO sponsorDTO) {
+    public ResponseEntity<InformationDTO> addSponsor(@PathVariable Long infoId, @Valid @RequestBody SponsorDTO sponsorDTO) {
         InformationDTO updated = informationService.addSponsorToInformation(infoId, sponsorDTO);
         return ResponseEntity.ok(updated);
     }
@@ -77,7 +78,7 @@ public class InformationController {
     }
 
     @PostMapping("/{infoId}/contacts")
-    public ResponseEntity<InformationDTO> addContact(@PathVariable Long infoId, @RequestBody ContactDTO contactDTO) {
+    public ResponseEntity<InformationDTO> addContact(@PathVariable Long infoId, @Valid @RequestBody ContactDTO contactDTO) {
         InformationDTO updated = informationService.addContactToInformation(infoId, contactDTO);
         return ResponseEntity.ok(updated);
     }

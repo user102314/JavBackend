@@ -36,7 +36,11 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
 
     private final SupabaseStorageProperties properties;
     private final ObjectMapper objectMapper;
-    private final OkHttpClient httpClient = new OkHttpClient();
+    private final OkHttpClient httpClient = new OkHttpClient.Builder()
+            .connectTimeout(java.time.Duration.ofSeconds(15))
+            .readTimeout(java.time.Duration.ofSeconds(30))
+            .writeTimeout(java.time.Duration.ofSeconds(30))
+            .build();
 
     private void ensureConfigured() {
         if (!StringUtils.hasText(properties.getProjectUrl()) || !StringUtils.hasText(properties.getServiceRoleKey())) {

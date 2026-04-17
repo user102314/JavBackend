@@ -6,6 +6,7 @@ import backend.admin.services.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 
@@ -17,7 +18,7 @@ public class AdminController {
     private final AdminService adminService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
         try {
             AdminDTO admin = adminService.login(loginRequest.getEmail(), loginRequest.getPassword());
             return ResponseEntity.ok(admin);
