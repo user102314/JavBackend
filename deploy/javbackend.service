@@ -1,0 +1,15 @@
+[Unit]
+Description=JavBackend Spring Boot Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/JavBackend
+ExecStart=/bin/bash -c '/usr/bin/java -jar $(ls -t %h/JavBackend/target/*.jar | head -n 1)'
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+Environment=SPRING_PROFILES_ACTIVE=prod
+
+[Install]
+WantedBy=default.target
