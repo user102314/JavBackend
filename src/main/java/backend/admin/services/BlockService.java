@@ -10,9 +10,9 @@ public interface BlockService {
 
     List<BlockDTO> getAllBlocks();
 
-    BlockDTO createBlock(String titre, String description, MultipartFile imageFile) throws IOException;
+    BlockDTO createBlock(String titre, String description, MultipartFile imageFile, List<String> motcle) throws IOException;
 
-    BlockDTO updateBlock(Long id, String titre, String description, MultipartFile imageFile) throws IOException;
+    BlockDTO updateBlock(Long id, String titre, String description, MultipartFile imageFile, List<String> motcle) throws IOException;
 
     void deleteBlock(Long id);
 }

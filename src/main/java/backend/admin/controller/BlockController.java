@@ -28,8 +28,9 @@ public class BlockController {
     public ResponseEntity<BlockDTO> createBlock(
             @RequestParam("titre") String titre,
             @RequestParam(value = "description", required = false) String description,
-            @RequestPart("file") MultipartFile file) throws IOException {
-        BlockDTO created = blockService.createBlock(titre, description, file);
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "motcle", required = false) List<String> motcle) throws IOException {
+        BlockDTO created = blockService.createBlock(titre, description, file, motcle);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
@@ -38,8 +39,9 @@ public class BlockController {
             @PathVariable Long id,
             @RequestParam(value = "titre", required = false) String titre,
             @RequestParam(value = "description", required = false) String description,
-            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
-        BlockDTO updated = blockService.updateBlock(id, titre, description, file);
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "motcle", required = false) List<String> motcle) throws IOException {
+        BlockDTO updated = blockService.updateBlock(id, titre, description, file, motcle);
         return ResponseEntity.ok(updated);
     }
 

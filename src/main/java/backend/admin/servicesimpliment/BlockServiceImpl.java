@@ -34,7 +34,7 @@ public class BlockServiceImpl implements BlockService {
     }
 
     @Override
-    public BlockDTO createBlock(String titre, String description, MultipartFile imageFile) throws IOException {
+    public BlockDTO createBlock(String titre, String description, MultipartFile imageFile, List<String> motcle) throws IOException {
         if (!StringUtils.hasText(titre)) {
             throw new IllegalArgumentException("titre is required");
         }
@@ -48,13 +48,14 @@ public class BlockServiceImpl implements BlockService {
         block.setTitre(titre.trim());
         block.setDescription(description != null ? description : "");
         block.setImage(publicUrl);
+        block.setMotcle(motcle);
 
         Block saved = blockRepository.save(block);
         return toDto(saved);
     }
 
     @Override
-    public BlockDTO updateBlock(Long id, String titre, String description, MultipartFile imageFile) throws IOException {
+    public BlockDTO updateBlock(Long id, String titre, String description, MultipartFile imageFile, List<String> motcle) throws IOException {
         Block block = blockRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Block not found"));
 
@@ -63,6 +64,9 @@ public class BlockServiceImpl implements BlockService {
         }
         if (description != null) {
             block.setDescription(description);
+        }
+        if (motcle != null) {
+            block.setMotcle(motcle);
         }
 
         if (imageFile != null && !imageFile.isEmpty()) {
@@ -90,5 +94,5 @@ public class BlockServiceImpl implements BlockService {
     private BlockDTO toDto(Block block) {
         // Important: buckets can be private, so we must return a browser-accessible URL (signed if needed).
         String img = supabaseStorageService.toBrowserAccessibleImageUrl(block.getImage());
-        return new BlockDTO(block.getId(), block.getTitre(), block.getDescription(), img);    }
+        return new BlockDTO(block.getId(), block.getTitre(), block.getDescription(), img, block.getMotcle());    }
 }
