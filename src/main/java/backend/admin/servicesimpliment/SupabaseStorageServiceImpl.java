@@ -66,7 +66,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         String endpoint = base + "/storage/v1/object/" + bucket + "/" + encodedPath;
 
         String ct = StringUtils.hasText(contentType) ? contentType : "application/octet-stream";
-        RequestBody body = RequestBody.create(MediaType.parse(ct), data);
+        RequestBody body = RequestBody.create(data, MediaType.parse(ct));
         Request request = new Request.Builder()
                 .url(endpoint)
                 .addHeader("Authorization", "Bearer " + properties.getServiceRoleKey())
